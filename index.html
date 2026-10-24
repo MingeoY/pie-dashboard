@@ -1,0 +1,1657 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>画饼数据看板 · PIE KPI CONSOLE</title>
+<style>
+  :root{
+    --ink:#eef2ff;
+    --muted:rgba(226,232,255,.62);
+    --faint:rgba(226,232,255,.40);
+    --glass-top:rgba(255,255,255,.14);
+    --glass-bottom:rgba(255,255,255,.045);
+    --stroke:rgba(255,255,255,.16);
+    --violet:#a78bfa;
+    --cyan:#22d3ee;
+    --pink:#f472b6;
+    --amber:#fbbf24;
+    --green:#34d399;
+    --blue:#60a5fa;
+    --radius:24px;
+  }
+
+  *{box-sizing:border-box;margin:0;padding:0}
+
+  html{scroll-behavior:smooth}
+
+  body{
+    min-height:100vh;
+    padding:30px 26px 46px;
+    color:var(--ink);
+    font-family:"Inter","SF Pro Display",system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+    font-variant-numeric:tabular-nums;
+    background:
+      radial-gradient(1100px 760px at 12% -12%, #241a52 0%, transparent 62%),
+      radial-gradient(900px 700px at 92% 6%, #06303d 0%, transparent 58%),
+      radial-gradient(1000px 900px at 46% 112%, #2c0d2e 0%, transparent 62%),
+      #060814;
+    overflow-x:hidden;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  /* ---------- 背景光斑 ---------- */
+  .bg{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+  .orb{
+    position:absolute;border-radius:50%;filter:blur(80px);opacity:.55;
+    will-change:transform;animation:drift 26s ease-in-out infinite alternate;
+  }
+  .orb-1{width:540px;height:540px;background:#7c3aed;top:-14%;left:-6%}
+  .orb-2{width:460px;height:460px;background:#0891b2;top:14%;right:-9%;animation-duration:32s;animation-delay:-6s}
+  .orb-3{width:520px;height:520px;background:#be185d;bottom:-18%;left:32%;opacity:.42;animation-duration:38s;animation-delay:-12s}
+  .orb-4{width:360px;height:360px;background:#1d4ed8;top:48%;left:-4%;opacity:.34;animation-duration:30s;animation-delay:-3s}
+
+  @keyframes drift{
+    0%{transform:translate3d(0,0,0) scale(1)}
+    50%{transform:translate3d(46px,-34px,0) scale(1.08)}
+    100%{transform:translate3d(-30px,42px,0) scale(.96)}
+  }
+
+  .bg-grid{
+    position:absolute;inset:0;
+    background-image:
+      linear-gradient(rgba(255,255,255,.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,.045) 1px, transparent 1px);
+    background-size:64px 64px;
+    mask-image:radial-gradient(ellipse at 50% 22%, #000 12%, transparent 78%);
+    -webkit-mask-image:radial-gradient(ellipse at 50% 22%, #000 12%, transparent 78%);
+  }
+
+  .bg-vignette{
+    position:absolute;inset:0;
+    background:radial-gradient(ellipse at 50% 40%, transparent 40%, rgba(4,6,16,.62) 100%);
+  }
+
+  /* ---------- 布局 ---------- */
+  .shell{position:relative;z-index:1;max-width:1320px;margin:0 auto}
+
+  .topbar{
+    display:flex;align-items:center;justify-content:space-between;gap:22px;
+    padding:16px 22px;margin-bottom:22px;flex-wrap:wrap;
+    background:linear-gradient(140deg, var(--glass-top), var(--glass-bottom));
+    border:1px solid var(--stroke);
+    border-radius:var(--radius);
+    backdrop-filter:blur(22px) saturate(160%);
+    -webkit-backdrop-filter:blur(22px) saturate(160%);
+    box-shadow:0 12px 40px rgba(2,4,16,.5), inset 0 1px 0 rgba(255,255,255,.32);
+  }
+
+  .brand{display:flex;align-items:center;gap:14px;min-width:0}
+
+  .brand-mark{
+    width:48px;height:48px;flex:0 0 48px;display:grid;place-items:center;
+    border-radius:16px;
+    background:linear-gradient(145deg, rgba(167,139,250,.34), rgba(34,211,238,.16));
+    border:1px solid rgba(255,255,255,.24);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.35), 0 8px 22px rgba(124,58,237,.32);
+  }
+
+  .brand h1{font-size:21px;font-weight:650;letter-spacing:.4px;line-height:1.25}
+  .brand p{
+    margin-top:4px;font-size:10px;letter-spacing:2.6px;text-transform:uppercase;
+    color:var(--faint);font-weight:500;
+  }
+
+  .topbar-right{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+
+  .segmented{
+    display:flex;padding:4px;gap:2px;border-radius:14px;
+    background:rgba(8,11,26,.42);
+    border:1px solid rgba(255,255,255,.10);
+    box-shadow:inset 0 1px 2px rgba(0,0,0,.35);
+  }
+  .segmented button{
+    appearance:none;border:0;cursor:pointer;
+    padding:8px 16px;border-radius:10px;
+    font:inherit;font-size:12.5px;font-weight:500;letter-spacing:.3px;
+    color:var(--muted);background:transparent;
+    transition:color .25s ease, background .25s ease, box-shadow .25s ease, transform .25s ease;
+  }
+  .segmented button:hover{color:var(--ink)}
+  .segmented button.active{
+    color:#0a0c1c;
+    background:linear-gradient(135deg, #c4b5fd, #a5f3fc);
+    box-shadow:0 4px 14px rgba(167,139,250,.45), inset 0 1px 0 rgba(255,255,255,.7);
+  }
+
+  .live{
+    display:flex;align-items:center;gap:9px;
+    padding:8px 14px;border-radius:12px;
+    font:inherit;font-size:12px;color:var(--muted);letter-spacing:.5px;
+    background:rgba(8,11,26,.34);
+    border:1px solid rgba(255,255,255,.10);
+    cursor:pointer;appearance:none;
+    transition:background .25s ease, border-color .25s ease, color .25s ease;
+  }
+  .live:hover{background:rgba(8,11,26,.5);border-color:rgba(255,255,255,.18)}
+  .live .dot{
+    width:7px;height:7px;border-radius:50%;background:var(--green);
+    box-shadow:0 0 0 0 rgba(52,211,153,.7);
+    animation:pulse 2.4s ease-out infinite;
+  }
+  .live b{color:var(--ink);font-weight:550;font-variant-numeric:tabular-nums}
+  .live.paused{color:var(--faint)}
+  .live.paused .dot{background:#94a3b8;box-shadow:none;animation:none}
+  .live.paused b{color:var(--faint)}
+
+  @keyframes pulse{
+    0%{box-shadow:0 0 0 0 rgba(52,211,153,.55)}
+    70%{box-shadow:0 0 0 9px rgba(52,211,153,0)}
+    100%{box-shadow:0 0 0 0 rgba(52,211,153,0)}
+  }
+
+  /* ---------- 滚动饼话 ---------- */
+  .ticker{
+    display:flex;align-items:center;gap:14px;
+    padding:0 20px;height:46px;margin-bottom:22px;
+    border-radius:16px;overflow:hidden;
+    background:rgba(255,255,255,.055);
+    border:1px solid rgba(255,255,255,.11);
+    backdrop-filter:blur(18px) saturate(150%);
+    -webkit-backdrop-filter:blur(18px) saturate(150%);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.18);
+  }
+  .ticker-label{
+    flex:0 0 auto;font-size:10.5px;letter-spacing:2px;font-weight:600;
+    color:#0b0d1c;padding:5px 10px;border-radius:7px;
+    background:linear-gradient(135deg,#fbbf24,#fda4af);
+  }
+  .ticker-window{flex:1;overflow:hidden;position:relative;
+    mask-image:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent);
+    -webkit-mask-image:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent);
+  }
+  .ticker-run{
+    display:inline-flex;white-space:nowrap;gap:42px;
+    animation:marquee 34s linear infinite;
+    font-size:12.5px;color:var(--muted);letter-spacing:.4px;
+  }
+  .ticker-run span::before{content:"·";color:var(--violet);margin-right:10px}
+  @keyframes marquee{
+    from{transform:translateX(0)}
+    to{transform:translateX(-50%)}
+  }
+  .ticker:hover .ticker-run{animation-play-state:paused}
+
+  /* ---------- 卡片基础 ---------- */
+  .card{
+    position:relative;overflow:hidden;
+    padding:22px 24px;
+    border-radius:var(--radius);
+    background:linear-gradient(150deg, var(--glass-top), var(--glass-bottom) 62%, rgba(255,255,255,.03));
+    border:1px solid var(--stroke);
+    backdrop-filter:blur(26px) saturate(165%);
+    -webkit-backdrop-filter:blur(26px) saturate(165%);
+    box-shadow:
+      0 18px 44px rgba(2,4,16,.46),
+      inset 0 1px 0 rgba(255,255,255,.3),
+      inset 0 -1px 0 rgba(255,255,255,.04);
+    transition:border-color .35s ease, box-shadow .35s ease, transform .35s ease;
+  }
+  .card::after{
+    content:"";position:absolute;pointer-events:none;
+    top:-120px;right:-90px;width:260px;height:260px;border-radius:50%;
+    background:radial-gradient(circle, rgba(255,255,255,.16), transparent 68%);
+    opacity:.7;
+  }
+  .card:hover{
+    border-color:rgba(255,255,255,.26);
+    box-shadow:0 24px 56px rgba(2,4,16,.55), inset 0 1px 0 rgba(255,255,255,.4);
+    transform:translateY(-2px);
+  }
+
+  .card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:18px}
+  .card-title{font-size:15px;font-weight:600;letter-spacing:.4px}
+  .card-sub{margin-top:6px;font-size:11.5px;color:var(--faint);letter-spacing:.3px}
+
+  .tag{
+    flex:0 0 auto;font-size:10px;letter-spacing:1.4px;padding:5px 9px;border-radius:7px;
+    color:rgba(226,232,255,.72);border:1px solid rgba(255,255,255,.14);
+    background:rgba(255,255,255,.06);
+  }
+
+  /* ---------- KPI ---------- */
+  .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-bottom:18px}
+
+  .kpi{display:flex;flex-direction:column;gap:14px;min-height:172px}
+  .kpi-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .kpi-label{font-size:12px;color:var(--muted);letter-spacing:.6px;display:flex;align-items:center;gap:8px}
+  .kpi-label i{
+    width:7px;height:7px;border-radius:50%;display:inline-block;
+    box-shadow:0 0 12px currentColor;
+  }
+  .kpi-chip{
+    font-size:9.5px;letter-spacing:1px;padding:3px 7px;border-radius:6px;
+    color:var(--faint);background:rgba(255,255,255,.055);
+    border:1px solid rgba(255,255,255,.08);
+  }
+  .kpi-main{display:flex;align-items:baseline;gap:7px;margin-top:2px}
+  .kpi-num{
+    font-size:38px;font-weight:640;letter-spacing:-1px;line-height:1;
+    text-shadow:0 0 26px rgba(167,139,250,.35);
+  }
+  .kpi-unit{font-size:12.5px;color:var(--faint);font-weight:500}
+  .kpi-bottom{display:flex;align-items:flex-end;justify-content:space-between;gap:10px;margin-top:auto}
+  .kpi-delta{display:flex;flex-direction:column;gap:5px}
+  .kpi-delta b{font-size:11.5px;font-weight:600;letter-spacing:.4px;display:flex;align-items:center;gap:4px}
+  .kpi-delta b.up{color:var(--green)}
+  .kpi-delta b.down{color:var(--pink)}
+  .kpi-delta em{font-size:10px;font-style:normal;color:var(--faint);letter-spacing:.4px}
+  .spark{width:96px;height:32px;overflow:visible}
+  .spark polyline{fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;
+    transition:points .6s ease}
+
+  /* ---------- 口径校验条 ---------- */
+  .ledger{
+    display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    margin:0 0 18px;padding:10px 16px;
+    border-radius:14px;
+    background:rgba(255,255,255,.045);
+    border:1px solid rgba(255,255,255,.10);
+    backdrop-filter:blur(16px) saturate(150%);
+    -webkit-backdrop-filter:blur(16px) saturate(150%);
+    font-size:10.5px;color:var(--faint);letter-spacing:.3px;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.14);
+  }
+  .ledger-badge{
+    flex:0 0 auto;font-size:9.5px;letter-spacing:1.2px;padding:4px 9px;border-radius:6px;
+    color:#071018;font-weight:600;
+    background:linear-gradient(135deg,#a7f3d0,#a5f3fc);
+  }
+  .ledger b{color:var(--ink);font-weight:600;margin:0 2px}
+  .ledger i{font-style:normal;color:var(--violet);margin:0 3px;font-weight:600}
+  .ledger-src{margin-left:auto;white-space:nowrap;opacity:.8}
+
+  /* ---------- 数据来源脚注（悬停展开台账明细） ---------- */
+  .src{
+    margin-top:16px;padding-top:11px;
+    border-top:1px solid rgba(255,255,255,.09);
+  }
+  .src-btn{
+    display:flex;align-items:center;gap:8px;width:100%;
+    margin:-4px -8px 0;padding:6px 8px;border-radius:9px;
+    border:1px solid transparent;background:transparent;cursor:help;
+    font:inherit;font-size:10px;line-height:1.55;letter-spacing:.2px;
+    color:var(--faint);text-align:left;
+    transition:background .25s ease, border-color .25s ease, color .25s ease;
+  }
+  .src-btn:hover,.src-btn[aria-expanded="true"]{
+    background:rgba(255,255,255,.06);
+    border-color:rgba(255,255,255,.10);
+    color:rgba(226,232,255,.7);
+  }
+  .src-text{flex:1;min-width:0}
+  .src-hint{
+    flex:0 0 auto;white-space:nowrap;
+    font-size:9px;letter-spacing:.6px;padding:2px 6px;border-radius:5px;
+    color:rgba(34,211,238,.9);
+    border:1px solid rgba(34,211,238,.26);
+    background:rgba(34,211,238,.09);
+    transition:background .25s ease;
+  }
+  .src-btn:hover .src-hint,.src-btn[aria-expanded="true"] .src-hint{background:rgba(34,211,238,.18)}
+  .src-mark{
+    flex:0 0 17px;height:17px;border-radius:5px;
+    display:grid;place-items:center;font-size:9px;line-height:1;
+    color:rgba(226,232,255,.72);background:rgba(255,255,255,.08);
+    border:1px solid rgba(255,255,255,.12);
+  }
+
+  /* ---------- 台账明细 Tooltip ---------- */
+  .tip-layer{
+    position:fixed;left:0;top:0;z-index:999;
+    width:340px;max-width:calc(100vw - 24px);
+    padding:14px 16px 13px;border-radius:16px;
+    background:linear-gradient(150deg, rgba(30,34,62,.93), rgba(12,15,32,.95));
+    border:1px solid rgba(255,255,255,.2);
+    backdrop-filter:blur(26px) saturate(165%);
+    -webkit-backdrop-filter:blur(26px) saturate(165%);
+    box-shadow:0 24px 64px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.22);
+    opacity:0;visibility:hidden;transform:translateY(6px) scale(.985);
+    transition:opacity .18s ease, transform .18s ease, visibility .18s;
+    pointer-events:none;
+  }
+  .tip-layer.show{opacity:1;visibility:visible;transform:none}
+  .tip-title{display:flex;align-items:center;justify-content:space-between;gap:8px;
+    font-size:11.5px;font-weight:600;letter-spacing:.4px}
+  .tip-tag{
+    flex:0 0 auto;font-size:8.5px;letter-spacing:1px;padding:2px 6px;border-radius:5px;
+    color:#071018;background:linear-gradient(135deg,#c4b5fd,#a5f3fc);
+  }
+  .tip-sub{margin:3px 0 10px;font-size:9.5px;color:var(--faint);letter-spacing:.3px}
+  .tip-table{width:100%;border-collapse:collapse;font-size:10.5px}
+  .tip-table th{
+    padding:0 0 6px;font-size:8.5px;font-weight:500;letter-spacing:.7px;
+    color:rgba(226,232,255,.42);text-align:right;
+  }
+  .tip-table th:first-child{text-align:left}
+  .tip-table td{
+    padding:4.5px 0;text-align:right;letter-spacing:.2px;
+    color:rgba(226,232,255,.78);
+    border-top:1px solid rgba(255,255,255,.07);
+    font-variant-numeric:tabular-nums;
+  }
+  .tip-table td:first-child{text-align:left;color:var(--ink)}
+  .tip-table tr:last-child td{padding-bottom:2px}
+  .tip-table .t-dim{display:block;margin-top:1px;font-size:8.5px;color:rgba(226,232,255,.4)}
+  .t-dot{display:inline-block;width:6px;height:6px;border-radius:2px;margin-right:6px;vertical-align:middle}
+  .tip-foot{
+    margin-top:10px;padding-top:9px;
+    border-top:1px solid rgba(255,255,255,.11);
+    font-size:9.5px;line-height:1.6;letter-spacing:.2px;color:var(--faint);
+  }
+
+  /* ---------- 实时事件提示 ---------- */
+  .live-toast{
+    position:fixed;right:22px;bottom:22px;z-index:998;
+    display:flex;align-items:center;gap:9px;
+    max-width:min(360px, calc(100vw - 28px));
+    padding:11px 15px;border-radius:14px;
+    font-size:11.5px;letter-spacing:.3px;color:rgba(238,242,255,.92);
+    background:linear-gradient(150deg, rgba(30,34,62,.92), rgba(12,15,32,.94));
+    border:1px solid rgba(255,255,255,.18);
+    backdrop-filter:blur(22px) saturate(160%);
+    -webkit-backdrop-filter:blur(22px) saturate(160%);
+    box-shadow:0 18px 44px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.2);
+    opacity:0;transform:translateY(12px);pointer-events:none;
+    transition:opacity .3s ease, transform .3s cubic-bezier(.22,1,.36,1);
+  }
+  .live-toast.show{opacity:1;transform:none}
+  .live-toast-dot{
+    flex:0 0 7px;width:7px;height:7px;border-radius:50%;
+    background:var(--violet);box-shadow:0 0 10px var(--violet);
+  }
+  .live-toast.is-done .live-toast-dot{background:var(--cyan);box-shadow:0 0 10px var(--cyan)}
+  .live-toast b{font-weight:600}
+  .live-toast em{font-style:normal;font-size:9.5px;color:var(--faint);margin-left:5px;white-space:nowrap}
+
+  @keyframes rowFlash{
+    0%{background:rgba(34,211,238,.16)}
+    55%{background:rgba(34,211,238,.05)}
+    100%{background:transparent}
+  }
+  .row-hit{animation:rowFlash 1.6s ease}
+
+
+  /* ---------- 部门 meta 与排行数值 ---------- */
+  .formula{
+    margin-top:14px;padding:8px 11px;border-radius:9px;
+    font-size:10px;line-height:1.6;letter-spacing:.2px;
+    color:rgba(226,232,255,.56);
+    background:rgba(255,255,255,.045);
+    border:1px dashed rgba(255,255,255,.12);
+  }
+
+  /* ---------- 图表行 ---------- */
+  .row{display:grid;grid-template-columns:1.05fr 1fr;gap:18px;margin-bottom:18px}
+  .row.rev{grid-template-columns:1.18fr 1fr}
+
+  /* 甜甜圈 */
+  .donut-wrap{display:flex;align-items:center;gap:20px}
+  .donut-box{position:relative;flex:0 0 200px;width:200px;height:200px}
+  .donut{width:100%;height:100%;transform:rotate(0deg)}
+  .donut-track{fill:none;stroke:rgba(255,255,255,.07);stroke-width:26}
+  .donut-seg{
+    fill:none;stroke-width:25;stroke-linecap:round;
+    transition:stroke-dasharray 1s cubic-bezier(.22,1,.36,1), stroke-dashoffset 1s cubic-bezier(.22,1,.36,1), stroke-width .3s ease, opacity .3s ease;
+    cursor:pointer;
+  }
+  .donut-seg.dim{opacity:.35}
+  .donut-seg.lit{stroke-width:31}
+  .donut-center{
+    position:absolute;inset:0;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:4px;text-align:center;
+    pointer-events:none;padding:0 34px;
+  }
+  .donut-num{font-size:30px;font-weight:650;letter-spacing:-1px;line-height:1.05}
+  .donut-num .u{font-size:11px;font-weight:500;color:var(--faint);margin-left:3px;letter-spacing:0}
+  .donut-cap{font-size:10.5px;color:var(--faint);letter-spacing:.6px;line-height:1.5}
+  .donut-center.flash .donut-num{font-size:20px;letter-spacing:0}
+
+  .legend{flex:1;display:flex;flex-direction:column;gap:9px;min-width:0}
+  .legend li{
+    display:flex;align-items:center;gap:9px;list-style:none;
+    padding:7px 10px;border-radius:10px;
+    transition:background .25s ease;
+    cursor:default;
+  }
+  .legend li:hover{background:rgba(255,255,255,.07)}
+  .legend i{width:8px;height:8px;border-radius:3px;flex:0 0 8px;box-shadow:0 0 10px currentColor}
+  .legend span{font-size:12px;color:var(--muted);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .legend b{font-size:12.5px;font-weight:600;letter-spacing:.3px}
+
+  /* 趋势图 */
+  .trend-legend{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  .trend-legend span{display:inline-flex;align-items:center;gap:6px;font-size:10.5px;color:var(--faint);letter-spacing:.4px}
+  .trend-legend i{width:16px;height:3px;border-radius:2px;display:inline-block}
+  .trend-box{margin-top:4px}
+  #trendSvg{display:block;width:100%;height:auto;overflow:visible}
+  #trendSvg .grid-line{stroke:rgba(255,255,255,.075);stroke-width:1;stroke-dasharray:3 6}
+  #trendSvg .axis-text{fill:rgba(226,232,255,.4);font-size:10.5px;letter-spacing:.4px}
+  #trendSvg .line{fill:none;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round;
+    transition:stroke-dashoffset 1.15s cubic-bezier(.22,1,.36,1)}
+  #trendSvg .line-sub{stroke-dasharray:none;stroke-width:2}
+  #trendSvg .dot{transition:r .2s ease}
+  #trendSvg .dot:hover{r:5.5}
+  #trendSvg .area{transition:opacity .8s ease}
+
+  /* 部门 */
+  .dept-list{display:flex;flex-direction:column;gap:10px}
+  .dept-row{display:flex;flex-direction:column;gap:7px;padding:5px 8px;margin:0 -8px;border-radius:11px}
+  .dept-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+  .dept-head span{font-size:12.5px;color:var(--muted);letter-spacing:.4px}
+  .dept-head b{font-size:13px;font-weight:600}
+  .dept-head b em{font-style:normal;font-size:9.5px;color:var(--faint);margin-left:2px;font-weight:400}
+  .dept-meta{font-size:9.5px;color:rgba(226,232,255,.46);letter-spacing:.2px;margin-top:-2px}
+  .dept-track{height:7px;border-radius:99px;background:rgba(255,255,255,.07);overflow:hidden;
+    box-shadow:inset 0 1px 2px rgba(0,0,0,.35)}
+  .dept-fill{
+    display:block;height:100%;border-radius:99px;width:0;
+    background:linear-gradient(90deg, rgba(167,139,250,.9), rgba(34,211,238,.95));
+    box-shadow:0 0 14px rgba(124,58,237,.55);
+    transition:width 1s cubic-bezier(.22,1,.36,1);
+  }
+
+  /* 排行榜 */
+  .rank-list{display:flex;flex-direction:column;gap:5px;list-style:none}
+  .rank-row{
+    display:grid;grid-template-columns:30px 1fr 92px 48px;align-items:center;gap:10px;
+    padding:8px 8px;border-radius:12px;
+    transition:background .25s ease;
+  }
+  .rank-row:hover{background:rgba(255,255,255,.06)}
+  .rank-no{
+    width:26px;height:26px;border-radius:9px;display:grid;place-items:center;
+    font-size:11px;font-weight:650;color:var(--muted);
+    background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.10);
+  }
+  .rank-row:nth-child(1) .rank-no{
+    color:#1a1200;background:linear-gradient(140deg,#fde68a,#f59e0b);
+    border-color:rgba(255,255,255,.45);box-shadow:0 4px 16px rgba(245,158,11,.45)
+  }
+  .rank-row:nth-child(2) .rank-no{
+    color:#141821;background:linear-gradient(140deg,#e5e7eb,#9ca3af);
+    border-color:rgba(255,255,255,.4);box-shadow:0 4px 14px rgba(203,213,225,.3)
+  }
+  .rank-row:nth-child(3) .rank-no{
+    color:#1a0f06;background:linear-gradient(140deg,#fdba74,#c2703b);
+    border-color:rgba(255,255,255,.35);box-shadow:0 4px 14px rgba(194,112,59,.35)
+  }
+  .rank-meta{min-width:0;display:flex;flex-direction:column;gap:2px}
+  .rank-meta b{font-size:12.5px;font-weight:600;letter-spacing:.3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rank-meta em{font-style:normal;font-size:10px;color:var(--faint);letter-spacing:.3px}
+  .rank-bar{height:5px;border-radius:99px;background:rgba(255,255,255,.07);overflow:hidden}
+  .rank-bar i{display:block;height:100%;width:0;border-radius:99px;
+    background:linear-gradient(90deg, rgba(244,114,182,.85), rgba(167,139,250,.95));
+    transition:width 1s cubic-bezier(.22,1,.36,1)}
+  .rank-val{display:flex;flex-direction:column;align-items:flex-end;gap:2px;
+    font-size:12.5px;font-weight:600;letter-spacing:.3px;line-height:1.2}
+  .rank-val u{text-decoration:none;font-size:9.5px;color:var(--faint);margin-left:2px;font-weight:400}
+  .rank-val em{font-style:normal;font-size:9px;font-weight:400;color:rgba(34,211,238,.7);letter-spacing:.2px}
+
+  /* ---------- 页脚 ---------- */
+  .foot{
+    display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;
+    padding:14px 6px 0;font-size:10.5px;color:var(--faint);letter-spacing:.6px;
+  }
+  .foot .sep{opacity:.5}
+
+  /* ---------- 入场动画 ---------- */
+  .reveal{opacity:0;transform:translateY(16px);animation:rise .75s cubic-bezier(.22,1,.36,1) forwards}
+  @keyframes rise{to{opacity:1;transform:none}}
+  .kpi:nth-child(1){animation-delay:.04s}
+  .kpi:nth-child(2){animation-delay:.10s}
+  .kpi:nth-child(3){animation-delay:.16s}
+  .kpi:nth-child(4){animation-delay:.22s}
+  .row:nth-of-type(2) .card:nth-child(1){animation-delay:.28s}
+  .row:nth-of-type(2) .card:nth-child(2){animation-delay:.34s}
+  .row:nth-of-type(3) .card:nth-child(1){animation-delay:.40s}
+  .row:nth-of-type(3) .card:nth-child(2){animation-delay:.46s}
+
+  /* ---------- 响应式 ---------- */
+  @media (max-width:1080px){
+    .kpi-grid{grid-template-columns:repeat(2,1fr)}
+    .row,.row.rev{grid-template-columns:1fr}
+    .donut-wrap{flex-direction:column;align-items:stretch}
+    .donut-box{align-self:center}
+  }
+  @media (max-width:680px){
+    body{padding:18px 14px 34px}
+    .topbar{padding:14px 16px}
+    .kpi-grid{grid-template-columns:1fr}
+    .kpi{min-height:158px}
+    .kpi-num{font-size:34px}
+    .card{padding:18px 18px}
+    .rank-row{grid-template-columns:28px 1fr 62px 44px;gap:8px}
+    .brand h1{font-size:18px}
+    .live{display:none}
+    .foot{font-size:10px}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important}
+    .reveal{opacity:1;transform:none}
+  }
+</style>
+</head>
+<body>
+
+<div class="bg" aria-hidden="true">
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+  <div class="orb orb-4"></div>
+  <div class="bg-grid"></div>
+  <div class="bg-vignette"></div>
+</div>
+
+<main class="shell">
+
+  <!-- 顶栏 -->
+  <header class="topbar reveal" style="animation-delay:0s">
+    <div class="brand">
+      <div class="brand-mark">
+        <svg viewBox="0 0 32 32" width="28" height="28" aria-hidden="true">
+          <circle cx="16" cy="16" r="13" fill="none" stroke="rgba(255,255,255,.28)" stroke-width="1.6"/>
+          <path d="M16 16 L16 3 A13 13 0 0 1 28.1 11.4 Z" fill="#c4b5fd"/>
+          <path d="M16 16 L28.1 11.4 A13 13 0 0 1 24.4 26.6 Z" fill="#67e8f9" opacity=".9"/>
+          <path d="M16 16 L24.4 26.6 A13 13 0 0 1 7.2 25.7 Z" fill="#f9a8d4" opacity=".85"/>
+          <circle cx="16" cy="16" r="3.4" fill="#0b0e1e" opacity=".45"/>
+        </svg>
+      </div>
+      <div>
+        <h1>画饼数据看板</h1>
+        <p>PIE KPI CONSOLE · 饼业中台 3.0</p>
+      </div>
+    </div>
+
+    <div class="topbar-right">
+      <div class="segmented" id="rangeSwitch" role="tablist" aria-label="时间范围">
+        <button type="button" data-range="week" role="tab" aria-selected="false">本周</button>
+        <button type="button" data-range="month" role="tab" aria-selected="false">本月</button>
+        <button type="button" data-range="year" role="tab" aria-selected="true" class="active">全年</button>
+      </div>
+      <button class="live" id="liveToggle" type="button" aria-pressed="true" title="点击暂停 / 恢复实时刷新">
+        <span class="dot"></span>
+        <span class="live-state">实时刷新</span>
+        <b id="clock">--:--:--</b>
+      </button>
+    </div>
+  </header>
+
+  <!-- 饼话滚动 -->
+  <div class="ticker reveal" style="animation-delay:.06s">
+    <span class="ticker-label">饼话快讯</span>
+    <div class="ticker-window">
+      <div class="ticker-run" id="tickerRun">
+        <span>「明年这时候，咱们就是行业第一」</span>
+        <span>「期权马上到位，先别急着看合同」</span>
+        <span>「这版上线就轻松了」</span>
+        <span>「年终奖看公司整体情况」</span>
+        <span>「先扛一扛，后面一定补」</span>
+        <span>「这个项目做完，你就是合伙人」</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- KPI -->
+  <section class="kpi-grid" id="kpiGrid" aria-label="核心指标"></section>
+
+  <!-- 数据口径校验 -->
+  <div class="ledger reveal" aria-label="数据口径校验">
+    <span class="ledger-badge">口径校验</span>
+    <span>部门合计 <b id="ledgerDept">—</b> 张 <i>=</i> 个人台账合计 <b id="ledgerPerson">—</b> 张 <i>=</i> KPI 累计画饼 <b id="ledgerKpi">—</b> 张</span>
+    <span class="ledger-src" id="ledgerSrc">饼业中台 · 承诺事件流 v3.2</span>
+  </div>
+
+  <!-- 饼类分布 + 趋势 -->
+  <section class="row">
+    <article class="card reveal">
+      <div class="card-head">
+        <div>
+          <div class="card-title">饼类分布</div>
+          <div class="card-sub">本期在画的饼，按承诺主类型拆分</div>
+        </div>
+        <span class="tag" id="donutTag">全年</span>
+      </div>
+      <div class="donut-wrap">
+        <div class="donut-box">
+          <svg class="donut" id="donutSvg" viewBox="0 0 220 220" aria-label="饼类分布环形图">
+            <circle class="donut-track" cx="110" cy="110" r="82"></circle>
+            <g id="donutSegs"></g>
+          </svg>
+          <div class="donut-center" id="donutCenter">
+            <div class="donut-num"><span id="donutNum">0</span><span class="u">张</span></div>
+            <div class="donut-cap" id="donutCap">饼量总计</div>
+          </div>
+        </div>
+        <ul class="legend" id="donutLegend"></ul>
+      </div>
+      <div class="src">
+        <button class="src-btn" type="button" data-tip="donut" aria-expanded="false">
+          <span class="src-mark">源</span>
+          <span class="src-text">数据源：承诺池分类标签，按承诺主类型归类</span>
+          <span class="src-hint">台账明细</span>
+        </button>
+      </div>
+    </article>
+
+    <article class="card reveal">
+      <div class="card-head">
+        <div>
+          <div class="card-title">画饼 vs 兑现</div>
+          <div class="card-sub">同一条承诺事件流的两种状态</div>
+        </div>
+        <div class="trend-legend">
+          <span><i style="background:#a78bfa"></i>画饼（左轴）</span>
+          <span><i style="background:#22d3ee"></i>兑现（右轴）</span>
+        </div>
+      </div>
+      <div class="trend-box">
+        <svg id="trendSvg" viewBox="0 0 680 268" preserveAspectRatio="xMidYMid meet" aria-label="画饼与兑现趋势"></svg>
+      </div>
+      <div class="src">
+        <button class="src-btn" type="button" data-tip="trend" aria-expanded="false">
+          <span class="src-mark">源</span>
+          <span class="src-text">数据源：承诺事件流按时间桶聚合，双轴独立刻度</span>
+          <span class="src-hint">台账明细</span>
+        </button>
+      </div>
+    </article>
+  </section>
+
+  <!-- 部门 + 大师榜 -->
+  <section class="row rev">
+    <article class="card reveal">
+      <div class="card-head">
+        <div>
+          <div class="card-title">部门画饼战力</div>
+          <div class="card-sub">综合战力指数 · 按指数降序，非按张数</div>
+        </div>
+        <span class="tag">PIE POWER</span>
+      </div>
+      <ul class="dept-list" id="deptList"></ul>
+      <div class="formula">战力 = 承诺量 45% + 平均饼径 25% + 传播指数 20% + 兑现数 10%（同档内归一化后加权）</div>
+      <div class="src">
+        <button class="src-btn" type="button" data-tip="dept" aria-expanded="false">
+          <span class="src-mark">源</span>
+          <span class="src-text">数据源：个人承诺台账，按发起人所属部门聚合</span>
+          <span class="src-hint">台账明细</span>
+        </button>
+      </div>
+    </article>
+
+    <article class="card reveal">
+      <div class="card-head">
+        <div>
+          <div class="card-title">画饼大师榜</div>
+          <div class="card-sub">个人维度 · TOP 5，按本期承诺张数</div>
+        </div>
+        <span class="tag" id="rankTag">全年</span>
+      </div>
+      <ul class="rank-list" id="rankList"></ul>
+      <div class="src">
+        <button class="src-btn" type="button" data-tip="rank" aria-expanded="false">
+          <span class="src-mark">源</span>
+          <span class="src-text">数据源：同一份个人台账的个人维度切片，取前 5 名</span>
+          <span class="src-hint">台账明细</span>
+        </button>
+      </div>
+    </article>
+  </section>
+
+  <footer class="foot">
+    <span>PIE KPI CONSOLE · 数据经艺术加工，请勿据此规划人生</span>
+    <span class="sep">/</span>
+    <span>饼很大，胃很小，愿你吃到的那一口是真的</span>
+  </footer>
+
+</main>
+
+<div class="tip-layer" id="tipLayer" role="tooltip" aria-hidden="true"></div>
+
+<div class="live-toast" id="liveToast" role="status" aria-live="polite"></div>
+
+<script>
+/* =========================================================
+   数据模型：三个时间范围 + 一套画饼指标
+   ========================================================= */
+const C = {
+  violet:'#a78bfa', cyan:'#22d3ee', amber:'#fbbf24',
+  pink:'#f472b6', green:'#34d399', blue:'#60a5fa'
+};
+
+// 饼类 → 颜色，环形图与明细表共用
+const TYPE_COLORS = {
+  '期权饼':C.violet, '上市饼':C.cyan, '加薪饼':C.amber,
+  '晋升饼':C.pink, '团建饼':C.green, '其他':C.blue
+};
+
+const RANGES = {
+  week: {
+    label: '本周',
+    kpis: [
+      { label:'累计画饼', value:12,  decimals:0, unit:'张',  delta: 9.1,  accent:C.violet, spark:[2,4,1,3,2,5,3] },
+      { label:'平均饼径', value:43.5, decimals:1, unit:'cm', delta: 4.2,  accent:C.cyan,   spark:[31,34,30,36,38,37,39] },
+      { label:'兑现率',   value:8.3, decimals:1, unit:'%',  delta:-1.6, accent:C.amber,  spark:[12,9,11,6,8,7,8] },
+      { label:'饼香指数', value:91.2, decimals:1, unit:'分', delta: 2.8,  accent:C.pink,   spark:[84,88,86,90,89,93,91] }
+    ],
+    trend: {
+      labels:['周一','周二','周三','周四','周五','周六','周日'],
+      promise:[1,3,2,2,3,1,0],
+      fulfilled:[0,0,1,0,0,0,0]
+    },
+    // 部门 → 成员：v=本期承诺张数，f=兑现张数，type=主攻饼类
+    depts: [
+      { name:'战略中心', cm:49.0, spread:90, members:[
+        ['王总',2,0,'上市饼'], ['周副总',2,0,'期权饼']
+      ]},
+      { name:'增长部', cm:45.5, spread:86, members:[
+        ['李大饼',2,0,'期权饼'], ['张总监',1,0,'加薪饼']
+      ]},
+      { name:'研发部', cm:39.2, spread:55, members:[
+        ['赵老板',1,1,'晋升饼'], ['沈工',1,0,'加薪饼']
+      ]},
+      { name:'市场部', cm:43.0, spread:74, members:[
+        ['陈经理',1,0,'团建饼']
+      ]},
+      { name:'HRBP', cm:37.8, spread:64, members:[
+        ['刘总监',1,0,'加薪饼']
+      ]},
+      { name:'财务部', cm:30.5, spread:24, members:[
+        ['秦总监',1,0,'上市饼']
+      ]}
+    ]
+  },
+
+  month: {
+    label: '本月',
+    kpis: [
+      { label:'累计画饼', value:126, decimals:0, unit:'张',  delta:18.6, accent:C.violet, spark:[18,24,21,26,30,32,35] },
+      { label:'平均饼径', value:43.9, decimals:1, unit:'cm', delta: 2.1, accent:C.cyan,   spark:[39,41,40,42,43,42,44] },
+      { label:'兑现率',   value:4.8, decimals:1, unit:'%',  delta:-0.8, accent:C.amber,  spark:[7,6,6,5,4,5,5] },
+      { label:'饼香指数', value:94.2, decimals:1, unit:'分', delta: 3.1, accent:C.pink,   spark:[87,90,89,92,93,92,94] }
+    ],
+    trend: {
+      labels:['第1周','第2周','第3周','第4周'],
+      promise:[26,31,34,35],
+      fulfilled:[1,2,1,2]
+    },
+    depts: [
+      { name:'战略中心', cm:48.1, spread:91, members:[
+        ['王总',12,1,'上市饼'], ['周副总',9,0,'期权饼'], ['吴总监',6,0,'加薪饼'], ['郑经理',4,0,'晋升饼'], ['孙专员',3,0,'团建饼']
+      ]},
+      { name:'增长部', cm:46.0, spread:87, members:[
+        ['李大饼',11,1,'期权饼'], ['张总监',9,0,'加薪饼'], ['何经理',4,0,'上市饼'], ['冯主管',2,0,'晋升饼'], ['蒋专员',2,0,'团建饼']
+      ]},
+      { name:'研发部', cm:40.8, spread:58, members:[
+        ['赵老板',7,1,'晋升饼'], ['沈工',6,1,'加薪饼'], ['韩主管',5,0,'期权饼'], ['曹工',3,0,'上市饼'], ['邓工',3,0,'团建饼']
+      ]},
+      { name:'市场部', cm:44.2, spread:78, members:[
+        ['陈经理',6,1,'团建饼'], ['褚总',5,0,'上市饼'], ['卫主管',4,0,'加薪饼'], ['吕专员',3,0,'晋升饼'], ['施专员',2,0,'期权饼']
+      ]},
+      { name:'HRBP', cm:39.0, spread:68, members:[
+        ['刘总监',4,1,'加薪饼'], ['姜经理',3,0,'晋升饼'], ['戚主管',3,0,'团建饼'], ['谢专员',2,0,'期权饼'], ['邹专员',2,0,'上市饼']
+      ]},
+      { name:'财务部', cm:32.4, spread:26, members:[
+        ['秦总监',2,0,'上市饼'], ['尤经理',1,0,'期权饼'], ['许主管',1,0,'加薪饼'], ['何专员',1,0,'晋升饼'], ['吕专员',1,0,'团建饼']
+      ]}
+    ]
+  },
+
+  year: {
+    label: '全年',
+    kpis: [
+      { label:'累计画饼', value:1284, decimals:0, unit:'张',  delta:42.7, accent:C.violet, spark:[72,88,95,102,110,118,124,132,140,118,104,128] },
+      { label:'平均饼径', value:43.7, decimals:1, unit:'cm', delta: 0.9, accent:C.cyan,   spark:[36,38,37,40,41,40,42,43,42,44,43,42] },
+      { label:'兑现率',   value:6.2, decimals:1, unit:'%',  delta: 0.4, accent:C.amber,  spark:[8,7,6,5,7,6,8,5,8,7,6,6] },
+      { label:'饼香指数', value:96.4, decimals:1, unit:'分', delta: 1.2, accent:C.pink,   spark:[88,90,91,89,92,94,93,95,94,96,95,96] }
+    ],
+    trend: {
+      labels:['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'],
+      promise:[72,85,91,88,102,110,118,124,132,140,118,104],
+      fulfilled:[3,5,6,4,8,7,9,6,11,9,6,5]
+    },
+    depts: [
+      { name:'战略中心', cm:48.2, spread:92, members:[
+        ['王总',96,3,'上市饼'], ['周副总',71,3,'期权饼'], ['吴总监',58,1,'加薪饼'], ['郑经理',47,1,'晋升饼'], ['孙专员',40,1,'团建饼']
+      ]},
+      { name:'增长部', cm:46.5, spread:88, members:[
+        ['李大饼',88,4,'期权饼'], ['张总监',74,4,'加薪饼'], ['何经理',52,3,'上市饼'], ['冯主管',41,2,'晋升饼'], ['蒋专员',31,1,'团建饼']
+      ]},
+      { name:'研发部', cm:41.0, spread:61, members:[
+        ['赵老板',61,6,'晋升饼'], ['沈工',55,5,'加薪饼'], ['韩主管',48,4,'期权饼'], ['曹工',42,3,'上市饼'], ['邓工',35,3,'团建饼']
+      ]},
+      { name:'市场部', cm:44.3, spread:79, members:[
+        ['陈经理',52,3,'团建饼'], ['褚总',46,3,'上市饼'], ['卫主管',40,2,'加薪饼'], ['吕专员',33,2,'晋升饼'], ['施专员',27,1,'期权饼']
+      ]},
+      { name:'HRBP', cm:39.6, spread:70, members:[
+        ['刘总监',44,4,'加薪饼'], ['姜经理',36,4,'晋升饼'], ['戚主管',28,3,'团建饼'], ['谢专员',24,2,'期权饼'], ['邹专员',20,2,'上市饼']
+      ]},
+      { name:'财务部', cm:33.1, spread:28, members:[
+        ['秦总监',31,2,'上市饼'], ['尤经理',24,2,'期权饼'], ['许主管',18,2,'加薪饼'], ['何专员',13,2,'晋升饼'], ['卢专员',9,1,'团建饼']
+      ]}
+    ]
+  }
+};
+
+const NS = 'http://www.w3.org/2000/svg';
+const el = (tag, cls) => { const n = document.createElement(tag); if (cls) n.className = cls; return n; };
+const svgEl = (tag, attrs) => {
+  const n = document.createElementNS(NS, tag);
+  for (const k in attrs) n.setAttribute(k, attrs[k]);
+  return n;
+};
+const fmt = n => n.toLocaleString('en-US');
+
+/* =========================================================
+   数字滚动
+   ========================================================= */
+function animateNumber(node, to, decimals = 0){
+  const from = parseFloat(node.dataset.val || '0');
+  node.dataset.val = to;
+  node.dataset.dec = decimals;
+  const token = node.dataset.anim = String(Number(node.dataset.anim || '0') + 1);
+  const dur = 900, t0 = performance.now();
+  function tick(now){
+    if (node.dataset.anim !== token) return;      // 被新动画或暂停打断
+    const p = Math.min(1, (now - t0) / dur);
+    const e = 1 - Math.pow(1 - p, 3);
+    const v = from + (to - from) * e;
+    node.textContent = decimals ? v.toFixed(decimals) : fmt(Math.round(v));
+    if (p < 1) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+
+/* 暂停实时刷新时，把还在滚动的数字直接落到目标值 */
+function snapNumbers(){
+  document.querySelectorAll('.kpi-num, .ledger b').forEach(node => {
+    node.dataset.anim = String(Number(node.dataset.anim || '0') + 1);
+    if (node.dataset.val == null) return;
+    const v = parseFloat(node.dataset.val);
+    const dec = parseInt(node.dataset.dec || '0', 10);
+    node.textContent = dec ? v.toFixed(dec) : fmt(Math.round(v));
+  });
+}
+
+/* =========================================================
+   KPI 卡片
+   ========================================================= */
+const kpiGrid = document.getElementById('kpiGrid');
+let kpiNodes = [];
+
+function buildKpis(data){
+  kpiGrid.innerHTML = '';
+  kpiNodes = data.map(k => {
+    const card = el('article', 'card kpi reveal');
+
+    const top = el('div', 'kpi-top');
+    const label = el('span', 'kpi-label');
+    const dot = el('i'); dot.style.background = k.accent; dot.style.color = k.accent;
+    label.append(dot, document.createTextNode(k.label));
+    const chip = el('span', 'kpi-chip');
+    top.append(label, chip);
+
+    const main = el('div', 'kpi-main');
+    const num = el('span', 'kpi-num'); num.textContent = '0';
+    const unit = el('span', 'kpi-unit'); unit.textContent = k.unit;
+    main.append(num, unit);
+
+    const bottom = el('div', 'kpi-bottom');
+    const deltaWrap = el('div', 'kpi-delta');
+    const deltaVal = el('b');
+    const note = el('em'); note.textContent = '较上期';
+    deltaWrap.append(deltaVal, note);
+
+    const spark = svgEl('svg', { class:'spark', viewBox:'0 0 96 32', preserveAspectRatio:'none' });
+    const poly = svgEl('polyline');
+    poly.style.stroke = k.accent;
+    poly.style.filter = `drop-shadow(0 0 4px ${k.accent}66)`;
+    spark.appendChild(poly);
+
+    bottom.append(deltaWrap, spark);
+
+    card.append(top, main, bottom);
+    kpiGrid.appendChild(card);
+    return { card, chip, num, deltaVal, poly, unit };
+  });
+}
+
+function updateKpis(data, label){
+  data.forEach((k, i) => {
+    const n = kpiNodes[i];
+    if (!n) return;
+    n.chip.textContent = label;
+    n.unit.textContent = k.unit;
+    n.num.dataset.dec = k.decimals;
+    animateNumber(n.num, k.value, k.decimals);
+
+    const up = k.delta >= 0;
+    n.deltaVal.className = up ? 'up' : 'down';
+    n.deltaVal.textContent = `${up ? '▲' : '▼'} ${Math.abs(k.delta).toFixed(1)}%`;
+
+    n.poly.setAttribute('points', sparkPoints(k.spark));
+  });
+}
+
+function sparkPoints(vals){
+  const w = 96, h = 32;
+  const max = Math.max(...vals), min = Math.min(...vals);
+  const range = (max - min) || 1;
+  return vals.map((v, i) => {
+    const x = (i / (vals.length - 1)) * w;
+    const y = h - 3 - ((v - min) / range) * (h - 8);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+}
+
+/* =========================================================
+   甜甜圈
+   ========================================================= */
+const donutSegs = document.getElementById('donutSegs');
+const donutLegend = document.getElementById('donutLegend');
+const donutCenter = document.getElementById('donutCenter');
+const donutNum = document.getElementById('donutNum');
+const donutCap = document.getElementById('donutCap');
+const R = 82, CIRC = 2 * Math.PI * R;
+
+let donutData = null;
+const donutRefs = new Map();
+
+function renderDonut(data){
+  donutData = data;
+  donutSegs.innerHTML = '';
+  donutLegend.innerHTML = '';
+  donutRefs.clear();
+
+  let start = 0;
+  data.donut.forEach(seg => {
+    const len = (seg.pct / 100) * CIRC;
+    const gap = 5;
+    const circle = svgEl('circle', {
+      class:'donut-seg',
+      cx:110, cy:110, r:R,
+      stroke:seg.color,
+      'stroke-dasharray':`0 ${CIRC}`,
+      'stroke-dashoffset':`${-start}`,
+      transform:'rotate(-90 110 110)'
+    });
+    circle.style.filter = `drop-shadow(0 0 7px ${seg.color}55)`;
+    donutSegs.appendChild(circle);
+
+    const target = Math.max(len - gap, 1);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        circle.setAttribute('stroke-dasharray', `${target.toFixed(2)} ${(CIRC - target).toFixed(2)}`);
+      });
+    });
+
+    // 图例
+    const li = el('li');
+    const swatch = el('i'); swatch.style.background = seg.color; swatch.style.color = seg.color;
+    const name = el('span'); name.textContent = seg.name;
+    const pct = el('b'); pct.textContent = `${seg.pct.toFixed(1)}%`;
+    li.append(swatch, name, pct);
+    donutLegend.appendChild(li);
+
+    donutRefs.set(seg.name, { circle, li, pctEl: pct });
+
+    circle.addEventListener('mouseenter', () => focusSeg(seg.name));
+    circle.addEventListener('mouseleave', clearSegFocus);
+    li.addEventListener('mouseenter', () => focusSeg(seg.name));
+    li.addEventListener('mouseleave', clearSegFocus);
+
+    start += len;
+  });
+
+  resetDonutCenter(data);
+}
+
+/* 实时刷新：只改弧长与百分比，不重建节点，过渡更平滑 */
+function updateDonut(data){
+  const same = data.donut.length === donutRefs.size && data.donut.every(s => donutRefs.has(s.name));
+  if (!same){ renderDonut(data); return; }
+
+  donutData = data;
+  let start = 0;
+  data.donut.forEach(seg => {
+    const ref = donutRefs.get(seg.name);
+    const len = (seg.pct / 100) * CIRC;
+    const target = Math.max(len - 5, 1);
+    ref.circle.setAttribute('stroke-dasharray', `${target.toFixed(2)} ${(CIRC - target).toFixed(2)}`);
+    ref.circle.setAttribute('stroke-dashoffset', `${-start}`);
+    ref.pctEl.textContent = `${seg.pct.toFixed(1)}%`;
+    donutLegend.appendChild(ref.li);
+    start += len;
+  });
+  if (!donutCenter.classList.contains('flash')) resetDonutCenter(data);
+}
+
+function focusSeg(name){
+  const seg = donutData && donutData.donut.find(s => s.name === name);
+  if (!seg) return;
+  donutCenter.classList.add('flash');
+  donutNum.textContent = `${seg.pct.toFixed(1)}%`;
+  donutCap.textContent = `${seg.name} · ${fmt(seg.v)} 张`;
+  donutRefs.forEach((r, n) => {
+    r.circle.classList.toggle('lit', n === name);
+    r.circle.classList.toggle('dim', n !== name);
+  });
+}
+
+function clearSegFocus(){
+  donutCenter.classList.remove('flash');
+  donutRefs.forEach(r => r.circle.classList.remove('dim', 'lit'));
+  resetDonutCenter(donutData);
+}
+
+function resetDonutCenter(data){
+  if (!data) return;
+  donutNum.textContent = fmt(data.donutTotal);
+  donutCap.textContent = `饼量总计 · 其中真饼 ${data.donutReal} 张`;
+}
+
+/* =========================================================
+   趋势图
+   ========================================================= */
+const trendSvg = document.getElementById('trendSvg');
+
+function smoothPath(pts){
+  if (pts.length < 2) return '';
+  let d = `M ${pts[0][0].toFixed(1)} ${pts[0][1].toFixed(1)}`;
+  for (let i = 0; i < pts.length - 1; i++){
+    const p0 = pts[i - 1] || pts[i];
+    const p1 = pts[i];
+    const p2 = pts[i + 1];
+    const p3 = pts[i + 2] || p2;
+    const c1x = p1[0] + (p2[0] - p0[0]) / 6;
+    const c1y = p1[1] + (p2[1] - p0[1]) / 6;
+    const c2x = p2[0] - (p3[0] - p1[0]) / 6;
+    const c2y = p2[1] - (p3[1] - p1[1]) / 6;
+    d += ` C ${c1x.toFixed(1)} ${c1y.toFixed(1)}, ${c2x.toFixed(1)} ${c2y.toFixed(1)}, ${p2[0].toFixed(1)} ${p2[1].toFixed(1)}`;
+  }
+  return d;
+}
+
+function renderTrend(t, animate = true){
+  const W = 680, H = 268, PL = 40, PR = 44, PT = 22, PB = 34;
+  const iw = W - PL - PR, ih = H - PT - PB;
+  const maxY = Math.max(...t.promise) * 1.16;
+  const maxF = Math.max(...t.fulfilled, 1) * 1.35;
+
+  const xAt = i => PL + (iw * i) / (t.labels.length - 1);
+  const yAt = v => PT + ih - (v / maxY) * ih;
+  const yF  = v => PT + ih - (v / maxF) * ih;
+
+  trendSvg.innerHTML = '';
+
+  const defs = svgEl('defs');
+  const grad = svgEl('linearGradient', { id:'areaViolet', x1:'0', y1:'0', x2:'0', y2:'1' });
+  grad.append(
+    svgEl('stop', { offset:'0%', 'stop-color':C.violet, 'stop-opacity':'.34' }),
+    svgEl('stop', { offset:'100%', 'stop-color':C.violet, 'stop-opacity':'0' })
+  );
+  defs.appendChild(grad);
+  trendSvg.appendChild(defs);
+
+  // 网格 + 左轴
+  for (let g = 0; g <= 3; g++){
+    const y = PT + (ih * g) / 3;
+    trendSvg.appendChild(svgEl('line', {
+      class:'grid-line', x1:PL, y1:y, x2:W - PR, y2:y
+    }));
+    const val = maxY * (1 - g / 3);
+    const label = svgEl('text', {
+      class:'axis-text', x:PL - 12, y:y + 4, 'text-anchor':'end'
+    });
+    label.textContent = Math.round(val);
+    trendSvg.appendChild(label);
+  }
+
+  // 右轴（兑现）
+  [0, 0.5, 1].forEach(p => {
+    const y = PT + ih - p * ih;
+    const label = svgEl('text', {
+      class:'axis-text', x:W - PR + 12, y:y + 4, 'text-anchor':'start'
+    });
+    label.setAttribute('fill', 'rgba(34,211,238,.62)');
+    label.textContent = Math.round(maxF * p);
+    trendSvg.appendChild(label);
+  });
+
+  // X 轴标签
+  t.labels.forEach((lb, i) => {
+    const label = svgEl('text', {
+      class:'axis-text', x:xAt(i), y:H - 10, 'text-anchor':'middle'
+    });
+    label.textContent = lb;
+    trendSvg.appendChild(label);
+  });
+
+  const pPts = t.promise.map((v, i) => [xAt(i), yAt(v)]);
+  const fPts = t.fulfilled.map((v, i) => [xAt(i), yF(v)]);
+
+  // 面积
+  const area = svgEl('path', {
+    class:'area',
+    d: `${smoothPath(pPts)} L ${xAt(t.labels.length - 1)} ${PT + ih} L ${PL} ${PT + ih} Z`,
+    fill:'url(#areaViolet)',
+    opacity:'1'
+  });
+  trendSvg.appendChild(area);
+
+  // 承诺线
+  const lineP = svgEl('path', {
+    class:'line', d:smoothPath(pPts), stroke:C.violet
+  });
+  trendSvg.appendChild(lineP);
+
+  // 兑现线
+  const lineF = svgEl('path', {
+    class:'line line-sub', d:smoothPath(fPts), stroke:C.cyan
+  });
+  trendSvg.appendChild(lineF);
+
+  // 数据点
+  pPts.forEach((p, i) => {
+    const c = svgEl('circle', {
+      class:'dot',
+      cx:p[0], cy:p[1], r:3.6,
+      fill:'#0b0e1e', stroke:C.violet, 'stroke-width':2.2
+    });
+    const title = svgEl('title');
+    title.textContent = `${t.labels[i]} · 画饼 ${t.promise[i]} 张 / 兑现 ${t.fulfilled[i]} 张`;
+    c.appendChild(title);
+    trendSvg.appendChild(c);
+  });
+  fPts.forEach((p, i) => {
+    const c = svgEl('circle', {
+      cx:p[0], cy:p[1], r:2.6,
+      fill:C.cyan, opacity:'.9'
+    });
+    const title = svgEl('title');
+    title.textContent = `${t.labels[i]} · 兑现 ${t.fulfilled[i]} 张`;
+    c.appendChild(title);
+    trendSvg.appendChild(c);
+  });
+
+  // 线条描边动画（仅首次渲染 / 切换周期时）
+  if (animate){
+    [lineP, lineF].forEach(line => {
+      const len = line.getTotalLength();
+      line.style.strokeDasharray = `${len}`;
+      line.style.strokeDashoffset = `${len}`;
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => { line.style.strokeDashoffset = '0'; });
+      });
+    });
+  }
+}
+
+/* =========================================================
+   部门 ↔ 个人聚合：只此一份台账，避免两处数据打架
+   ========================================================= */
+function aggregateRange(raw, live){
+  const add = (live && live.add) || {};
+  const done = (live && live.done) || {};
+
+  const depts = raw.depts.map(d => {
+    let v = 0, f = 0;
+    const members = d.members.map(([name, mv, mf, type]) => {
+      const v2 = mv + (add[name] || 0);
+      const f2 = mf + (done[name] || 0);
+      v += v2; f += f2;
+      return { name, dept: d.name, v: v2, f: f2, type };
+    });
+    return { name: d.name, cm: d.cm, spread: d.spread, v, f, members };
+  });
+
+  const maxV = Math.max(...depts.map(d => d.v));
+  const maxCm = Math.max(...depts.map(d => d.cm));
+  const maxSpread = Math.max(...depts.map(d => d.spread));
+  const maxF = Math.max(...depts.map(d => d.f), 1);
+
+  depts.forEach(d => {
+    d.score = 45 * (d.v / maxV) + 25 * (d.cm / maxCm) +
+              20 * (d.spread / maxSpread) + 10 * (d.f / maxF);
+  });
+  depts.sort((a, b) => b.score - a.score);
+
+  const people = depts.flatMap(d => d.members).sort((a, b) => (b.v - a.v) || (b.f - a.f));
+  const totalV = depts.reduce((s, d) => s + d.v, 0);
+  const totalF = depts.reduce((s, d) => s + d.f, 0);
+  const avgCm = depts.reduce((s, d) => s + d.cm * d.v, 0) / totalV;
+
+  // 实时增量落进每个周期最后一个时间桶，保证 桶合计 = 台账合计
+  const deltaV = totalV - raw.depts.reduce((s, d) => s + d.members.reduce((x, m) => x + m[1], 0), 0);
+  const deltaF = totalF - raw.depts.reduce((s, d) => s + d.members.reduce((x, m) => x + m[2], 0), 0);
+  const trend = {
+    labels: raw.trend.labels.slice(),
+    promise: raw.trend.promise.slice(),
+    fulfilled: raw.trend.fulfilled.slice()
+  };
+  const last = trend.promise.length - 1;
+  if (deltaV) trend.promise[last] += deltaV;
+  if (deltaF) trend.fulfilled[last] += deltaF;
+
+  // 饼类分布同样从个人台账汇总，不再单独写死
+  const byType = {};
+  people.forEach(m => { byType[m.type] = (byType[m.type] || 0) + m.v; });
+  const donut = Object.entries(byType)
+    .map(([name, v]) => ({ name, v, pct: (v / totalV) * 100, color: TYPE_COLORS[name] || C.blue }))
+    .sort((a, b) => b.v - a.v);
+
+  return { depts, people, byType, donut, trend, totalV, totalF, avgCm, rate: (totalF / totalV) * 100 };
+}
+
+/* =========================================================
+   部门战力
+   ========================================================= */
+const deptList = document.getElementById('deptList');
+const deptRefs = new Map();
+
+function deptMetaText(d){
+  return `参与 ${d.members.length} 人 · 承诺 ${fmt(d.v)} 张 · 兑现 ${d.f} 张 · 平均饼径 ${d.cm.toFixed(1)}cm`;
+}
+
+function renderDepts(depts){
+  deptList.innerHTML = '';
+  deptRefs.clear();
+  const maxScore = depts[0].score;
+  depts.forEach((d, i) => {
+    const li = el('li', 'dept-row');
+
+    const head = el('div', 'dept-head');
+    const name = el('span'); name.textContent = d.name;
+    const score = el('b');
+    score.dataset.v = d.score.toFixed(1);
+    score.innerHTML = `${d.score.toFixed(1)}<em>分</em>`;
+    head.append(name, score);
+
+    const meta = el('div', 'dept-meta');
+    meta.textContent = deptMetaText(d);
+
+    const track = el('div', 'dept-track');
+    const fill = el('i', 'dept-fill');
+    track.appendChild(fill);
+
+    li.append(head, meta, track);
+    deptList.appendChild(li);
+    deptRefs.set(d.name, { li, score, meta, fill });
+
+    const pct = Math.max(8, (d.score / maxScore) * 100);
+    setTimeout(() => { fill.style.width = `${pct}%`; }, 40 + i * 70);
+  });
+}
+
+/* 实时刷新：更新数值与排序，变化行闪烁提示 */
+function patchDepts(depts){
+  const maxScore = depts[0].score;
+  depts.forEach(d => {
+    const r = deptRefs.get(d.name);
+    if (!r) return;
+    const txt = d.score.toFixed(1);
+    if (r.score.dataset.v !== txt){
+      r.score.dataset.v = txt;
+      r.score.innerHTML = `${txt}<em>分</em>`;
+      r.li.classList.remove('row-hit');
+      void r.li.offsetWidth;
+      r.li.classList.add('row-hit');
+    }
+    r.meta.textContent = deptMetaText(d);
+    r.fill.style.width = `${Math.max(8, (d.score / maxScore) * 100)}%`;
+    deptList.appendChild(r.li);
+  });
+}
+
+/* =========================================================
+   大师榜（个人维度）
+   ========================================================= */
+const rankList = document.getElementById('rankList');
+const rankRefs = new Map();
+
+function renderRanks(people){
+  rankList.innerHTML = '';
+  rankRefs.clear();
+  const top = people.slice(0, 5);
+  const max = top[0].v;
+
+  top.forEach((m, i) => {
+    const li = el('li', 'rank-row');
+    li.title = `${m.name} · 本期承诺 ${m.v} 张，兑现 ${m.f} 张`;
+
+    const no = el('span', 'rank-no'); no.textContent = i + 1;
+
+    const meta = el('div', 'rank-meta');
+    const name = el('b'); name.textContent = m.name;
+    const dept = el('em'); dept.textContent = `${m.dept} · 主攻${m.type}`;
+    meta.append(name, dept);
+
+    const bar = el('div', 'rank-bar');
+    const barFill = el('i');
+    bar.appendChild(barFill);
+
+    const val = el('span', 'rank-val');
+    val.innerHTML = `${fmt(m.v)}<u>张</u><em>兑现 ${m.f}</em>`;
+
+    li.append(no, meta, bar, val);
+    rankList.appendChild(li);
+    rankRefs.set(m.name, { li, no, val, barFill, v: m.v });
+
+    const pct = Math.max(6, (m.v / max) * 100);
+    setTimeout(() => { barFill.style.width = `${pct}%`; }, 80 + i * 65);
+  });
+}
+
+/* 实时刷新：数值、名次、条形宽度局部更新；榜单换人时整体重建 */
+function patchRanks(people){
+  const top = people.slice(0, 5);
+  const same = top.every(m => rankRefs.has(m.name));
+  if (!same || rankRefs.size !== top.length){ renderRanks(people); return; }
+
+  const max = top[0].v;
+  top.forEach((m, i) => {
+    const r = rankRefs.get(m.name);
+    r.no.textContent = i + 1;
+    if (r.v !== m.v){
+      r.v = m.v;
+      r.li.classList.remove('row-hit');
+      void r.li.offsetWidth;
+      r.li.classList.add('row-hit');
+    }
+    r.val.innerHTML = `${fmt(m.v)}<u>张</u><em>兑现 ${m.f}</em>`;
+    r.barFill.style.width = `${Math.max(6, (m.v / max) * 100)}%`;
+    r.li.title = `${m.name} · 本期承诺 ${m.v} 张，兑现 ${m.f} 张`;
+    rankList.appendChild(r.li);
+  });
+}
+
+/* =========================================================
+   渲染总入口
+   ========================================================= */
+let currentRange = 'year';
+let currentAgg = null;
+
+function render(rangeKey){
+  currentRange = rangeKey;
+  closeTip();
+  applyView(RANGES[rangeKey], true);
+}
+
+/* animate=true：切换周期，重建并播放入场动画
+   animate=false：实时刷新，只做局部数值更新 */
+function applyView(raw, animate){
+  const agg = aggregateRange(raw, LIVE);
+  currentAgg = agg;
+
+  // 三个核心指标全部由台账推导，不再写死
+  const kpis = raw.kpis.map(k => ({ ...k }));
+  kpis[0].value = agg.totalV;
+  kpis[1].value = Math.round(agg.avgCm * 10) / 10;
+  kpis[2].value = Math.round(agg.rate * 10) / 10;
+
+  const data = { ...raw, ...agg, kpis, donutTotal: agg.totalV, donutReal: agg.totalF };
+  viewData = data;
+
+  document.getElementById('donutTag').textContent = data.label;
+  document.getElementById('rankTag').textContent = data.label;
+
+  updateKpis(kpis, data.label);
+  if (animate){
+    renderDonut(data);
+    renderDepts(agg.depts);
+    renderRanks(agg.people);
+  } else {
+    updateDonut(data);
+    patchDepts(agg.depts);
+    patchRanks(agg.people);
+  }
+  renderTrend(data.trend, animate);
+
+  // 口径校验：部门 / 个人 / KPI 同源，三值恒等
+  ['ledgerDept', 'ledgerPerson', 'ledgerKpi'].forEach(id => {
+    animateNumber(document.getElementById(id), agg.totalV, 0);
+  });
+  document.getElementById('ledgerSrc').textContent =
+    `${data.label} · ${agg.depts.length} 个部门 / ${agg.people.length} 位承诺人 · 饼业中台`;
+
+  // 若明细浮层正打开，内容随数据一起刷新
+  if (activeTipBtn) openTip(activeTipBtn);
+}
+
+/* =========================================================
+   数据源脚注 Tooltip：悬停 / 聚焦展开台账明细
+   ========================================================= */
+let viewData = null;
+let activeTipBtn = null;
+const tipLayer = document.getElementById('tipLayer');
+
+function tipSpec(key){
+  const d = viewData;
+  if (!d) return null;
+
+  if (key === 'donut'){
+    return {
+      title: '饼类分布 · 台账明细',
+      sub: `${d.label} · 按承诺主类型归类`,
+      cols: ['类型', '张数', '占比'],
+      rows: d.donut.map(s => [
+        `<i class="t-dot" style="background:${s.color}"></i>${s.name}`,
+        fmt(s.v),
+        `${s.pct.toFixed(1)}%`
+      ]),
+      foot: `合计 ${fmt(d.totalV)} 张 · ${d.people.length} 位承诺人 · 与个人台账加总一致`
+    };
+  }
+
+  if (key === 'trend'){
+    return {
+      title: '画饼 vs 兑现 · 时间桶明细',
+      sub: `${d.label} · 共 ${d.trend.labels.length} 个统计桶`,
+      cols: ['时间', '画饼', '兑现', '兑现率'],
+      rows: d.trend.labels.map((lb, i) => {
+        const p = d.trend.promise[i];
+        const f = d.trend.fulfilled[i];
+        return [lb, fmt(p), fmt(f), p ? `${((f / p) * 100).toFixed(1)}%` : '—'];
+      }),
+      foot: `合计 画饼 ${fmt(d.totalV)} 张 · 兑现 ${fmt(d.totalF)} 张 · 兑现率 ${d.rate.toFixed(1)}%`
+    };
+  }
+
+  if (key === 'dept'){
+    return {
+      title: '部门战力 · 构成明细',
+      sub: `${d.label} · 各指标同档内归一化后加权`,
+      cols: ['部门', '承诺', '兑现', '战力'],
+      rows: d.depts.map(x => [
+        x.name,
+        `${fmt(x.v)} 张`,
+        `${x.f} 张`,
+        x.score.toFixed(1)
+      ]),
+      foot: '战力 = 承诺量 45% + 平均饼径 25% + 传播指数 20% + 兑现数 10%'
+    };
+  }
+
+  if (key === 'rank'){
+    const top = d.people.slice(0, 5);
+    const rest = d.people.slice(5);
+    const topSum = top.reduce((s, m) => s + m.v, 0);
+    const restSum = rest.reduce((s, m) => s + m.v, 0);
+    return {
+      title: '个人台账 · TOP 5 明细',
+      sub: `${d.label} · 按承诺张数排序`,
+      cols: ['#', '姓名', '承诺', '兑现'],
+      rows: top.map((m, i) => [
+        String(i + 1),
+        `${m.name}<span class="t-dim">${m.dept} · 主攻${m.type}</span>`,
+        `${fmt(m.v)} 张`,
+        `${m.f} 张`
+      ]),
+      foot: `TOP 5 合计 ${fmt(topSum)} 张 · 榜外 ${rest.length} 人 ${fmt(restSum)} 张 · 总计 ${fmt(d.totalV)} 张`
+    };
+  }
+
+  return null;
+}
+
+function tipMarkup(spec){
+  return `
+    <div class="tip-title"><b>${spec.title}</b><span class="tip-tag">明细</span></div>
+    <div class="tip-sub">${spec.sub}</div>
+    <table class="tip-table">
+      <thead><tr>${spec.cols.map(c => `<th>${c}</th>`).join('')}</tr></thead>
+      <tbody>${spec.rows.map(r => `<tr>${r.map(c => `<td>${c}</td>`).join('')}</tr>`).join('')}</tbody>
+    </table>
+    <div class="tip-foot">${spec.foot}</div>`;
+}
+
+function positionTip(btn){
+  const r = btn.getBoundingClientRect();
+  const tw = tipLayer.offsetWidth;
+  const th = tipLayer.offsetHeight;
+  let left = r.left + r.width / 2 - tw / 2;
+  left = Math.max(12, Math.min(left, window.innerWidth - tw - 12));
+  let top = r.top - th - 12;
+  if (top < 12) top = r.bottom + 12;
+  top = Math.min(top, window.innerHeight - th - 12);
+  tipLayer.style.left = `${Math.round(left)}px`;
+  tipLayer.style.top = `${Math.round(Math.max(12, top))}px`;
+}
+
+function openTip(btn){
+  const spec = tipSpec(btn.dataset.tip);
+  if (!spec) return;
+  activeTipBtn = btn;
+  tipLayer.innerHTML = tipMarkup(spec);
+  tipLayer.classList.add('show');
+  tipLayer.setAttribute('aria-hidden', 'false');
+  document.querySelectorAll('.src-btn').forEach(b => {
+    b.setAttribute('aria-expanded', String(b === btn));
+  });
+  positionTip(btn);
+}
+
+function closeTip(){
+  activeTipBtn = null;
+  tipLayer.classList.remove('show');
+  tipLayer.setAttribute('aria-hidden', 'true');
+  document.querySelectorAll('.src-btn').forEach(b => b.setAttribute('aria-expanded', 'false'));
+}
+
+document.querySelectorAll('.src-btn').forEach(btn => {
+  btn.addEventListener('mouseenter', () => openTip(btn));
+  btn.addEventListener('mouseleave', closeTip);
+  btn.addEventListener('focus', () => openTip(btn));
+  btn.addEventListener('blur', closeTip);
+  // 桌面端走悬停，触屏端点按切换
+  btn.addEventListener('click', () => {
+    if (!window.matchMedia('(hover: none)').matches) return;
+    if (btn.getAttribute('aria-expanded') === 'true') closeTip();
+    else openTip(btn);
+  });
+});
+
+window.addEventListener('scroll', closeTip, { passive: true });
+window.addEventListener('resize', closeTip);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeTip(); });
+
+/* =========================================================
+   实时刷新：模拟承诺事件流（默认每 5s 一条）
+   ========================================================= */
+const LIVE = { every: 5000, on: true, timer: null, add: {}, done: {} };
+
+function nowText(){
+  const n = new Date(), p = x => String(x).padStart(2, '0');
+  return `${p(n.getHours())}:${p(n.getMinutes())}:${p(n.getSeconds())}`;
+}
+
+function randomOf(arr){ return arr[Math.floor(Math.random() * arr.length)]; }
+
+function emitEvent(){
+  if (!currentAgg || !currentAgg.people.length) return;
+
+  const isDone = Math.random() < 0.12;          // 少量事件是「兑现」
+  const p = randomOf(currentAgg.people);
+
+  if (isDone) LIVE.done[p.name] = (LIVE.done[p.name] || 0) + 1;
+  else        LIVE.add[p.name]  = (LIVE.add[p.name] || 0) + 1;
+
+  applyView(RANGES[currentRange], false);
+  showToast({ kind: isDone ? 'done' : 'add', name: p.name, dept: p.dept, type: p.type });
+}
+
+function showToast(ev){
+  const toast = document.getElementById('liveToast');
+  toast.classList.toggle('is-done', ev.kind === 'done');
+  toast.innerHTML =
+    `<span class="live-toast-dot"></span>` +
+    `<span><b>${ev.name}</b> ${ev.kind === 'done' ? '兑现' : '新画'} 1 张${ev.type}</span>` +
+    `<em>${ev.dept} · ${nowText()}</em>`;
+  toast.classList.add('show');
+  clearTimeout(showToast.timer);
+  showToast.timer = setTimeout(() => toast.classList.remove('show'), 2800);
+}
+
+function startLive(){
+  clearInterval(LIVE.timer);
+  LIVE.timer = setInterval(emitEvent, LIVE.every);
+}
+
+function setLive(on){
+  LIVE.on = on;
+  const btn = document.getElementById('liveToggle');
+  btn.classList.toggle('paused', !on);
+  btn.setAttribute('aria-pressed', String(on));
+  btn.querySelector('.live-state').textContent = on ? '实时刷新' : '已暂停';
+  if (on) startLive();
+  else { clearInterval(LIVE.timer); LIVE.timer = null; snapNumbers(); }
+}
+
+/* =========================================================
+   初始化与交互
+   ========================================================= */
+buildKpis(RANGES.year.kpis);
+render('year');
+
+document.querySelectorAll('#rangeSwitch button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (btn.dataset.range === currentRange) return;
+    document.querySelectorAll('#rangeSwitch button').forEach(b => {
+      b.classList.toggle('active', b === btn);
+      b.setAttribute('aria-selected', b === btn ? 'true' : 'false');
+    });
+    render(btn.dataset.range);
+  });
+});
+
+// 实时刷新开关
+document.getElementById('liveToggle').addEventListener('click', () => setLive(!LIVE.on));
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) clearInterval(LIVE.timer);
+  else if (LIVE.on) startLive();
+});
+setLive(true);
+
+// 时钟
+function tickClock(){
+  document.getElementById('clock').textContent = nowText();
+}
+tickClock();
+setInterval(tickClock, 1000);
+
+// 饼话滚动：复制一份实现无缝
+const tickerRun = document.getElementById('tickerRun');
+tickerRun.innerHTML += tickerRun.innerHTML.replace(/<span/g, '<span aria-hidden="true"');
+</script>
+</body>
+</html>
